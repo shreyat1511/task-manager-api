@@ -54,7 +54,7 @@ http://localhost:5000/api/v1
 **Response:** 200 - Returns updated task
 
 ### DELETE /tasks/:id
-⚠️ Admin only
+Admin only
 **Response:** 200 - `{ "msg": "Task deleted" }`
 
 ## Database Schema
