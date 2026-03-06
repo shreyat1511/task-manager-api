@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Task Manager</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+    body { background: #1a1a2e; color: #eee; min-height: 100vh; }
+    .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+    h1 { text-align: center; color: #e94560; margin-bottom: 30px; }
+    .card { background: #16213e; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+    input { width: 100%; padding: 10px; margin: 8px 0; border-radius: 5px; border: none; background: #0f3460; color: #eee; }
+    button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+    .btn-primary { background: #e94560; color: white; }
+    .btn-success { background: #27ae60; color: white; }
+    .btn-danger { background: #c0392b; color: white; }
+    .btn-secondary { background: #0f3460; color: white; }
+    .task-item { background: #0f3460; padding: 15px; border-radius: 8px; margin: 10px 0; display: flex; justify-content: space-between; align-items: center; }
+    .hidden { display: none; }
+    .msg { padding: 10px; border-radius: 5px; margin: 10px 0; text-align: center; }
+    .success { background: #27ae60; }
+    .error { background: #c0392b; }
+    nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Task Manager</h1>
+
+    <!-- Auth Section -->
+    <div id="authSection">
+      <div class="card">
+        <h2>Register</h2>
+        <input id="regName" placeholder="Name" />
+        <input id="regEmail" placeholder="Email" type="email" />
+        <input id="regPassword" placeholder="Password" type="password" />
+        <select id="regRole" style="width:100%;padding:10px;margin:8px 0;border-radius:5px;border:none;background:#0f3460;color:#eee;">
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+        <button class="btn-primary" onclick="register()">Register</button>
+        <div id="regMsg"></div>
+      </div>
+
+      <div class="card">
+        <h2>Login</h2>
+        <input id="loginEmail" placeholder="Email" type="email" />
+        <input id="loginPassword" placeholder="Password" type="password" />
+        <button class="btn-primary" onclick="login()">Login</button>
+        <div id="loginMsg"></div>
+      </div>
+    </div>
+
+    <!-- Dashboard Section -->
+    <div id="dashboard" class="hidden">
+      <nav>
+        <h2>Welcome, <span id="userName"></span> (<span id="userRole"></span>)</h2>
+        <button class="btn-secondary" onclick="logout()">Logout</button>
+      </nav>
+
+      <div class="card">
+        <h3>Add Task</h3>
+        <input id="taskTitle" placeholder="Task title" />
+        <input id="taskDesc" placeholder="Description" />
+        <button class="btn-success" onclick="createTask()">Add Task</button>
+        <div id="taskMsg"></div>
+      </div>
+
+      <div class="card">
+        <h3>My Tasks</h3>
+        <div id="taskList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = 'http://localhost:5000/api/v1';
+    let token = '';
+    let currentUser = {};
+
+    function showMsg(id, msg, type) {
+      const el = document.getElementById(id);
+      el.className = `msg ${type}`;
+      el.innerText = msg;
+      setTimeout(() => el.innerText = '', 3000);
+    }
+
+    async function register() {
+      const name = document.getElementById('regName').value;
+      const email = document.getElementById('regEmail').value;
+      const password = document.getElementById('regPassword').value;
+      const role = document.getElementById('regRole').value;
+
+      const res = await fetch(`${API}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, role })
+      });
+      const data = await res.json();
+      if (res.ok) showMsg('regMsg', 'Registered successfully! Please login.', 'success');
+      else showMsg('regMsg', data.msg, 'error');
+    }
+
+    async function login() {
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+
+      const res = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        token = data.token;
+        currentUser = data.user;
+        document.getElementById('authSection').classList.add('hidden');
+        document.getElementById('dashboard').classList.remove('hidden');
+        document.getElementById('userName').innerText = data.user.name;
+        document.getElementById('userRole').innerText = data.user.role;
+        getTasks();
+      } else {
+        showMsg('loginMsg', data.msg, 'error');
+      }
+    }
+
+    function logout() {
+      token = '';
+      currentUser = {};
+      document.getElementById('authSection').classList.remove('hidden');
+      document.getElementById('dashboard').classList.add('hidden');
+    }
+
+    async function createTask() {
+      const title = document.getElementById('taskTitle').value;
+      const description = document.getElementById('taskDesc').value;
+
+      const res = await fetch(`${API}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ title, description })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showMsg('taskMsg', 'Task created!', 'success');
+        document.getElementById('taskTitle').value = '';
+        document.getElementById('taskDesc').value = '';
+        getTasks();
+      } else showMsg('taskMsg', data.msg, 'error');
+    }
+
+    async function getTasks() {
+      const res = await fetch(`${API}/tasks`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const tasks = await res.json();
+      const list = document.getElementById('taskList');
+      list.innerHTML = '';
+      if (tasks.length === 0) { list.innerHTML = '<p>No tasks yet!</p>'; return; }
+      tasks.forEach(task => {
+        list.innerHTML += `
+          <div class="task-item">
+            <div>
+              <strong>${task.title}</strong>
+              <p style="font-size:0.85em;color:#aaa">${task.description || ''}</p>
+            </div>
+            <div>
+              ${currentUser.role === 'admin' ? `<button class="btn-danger" onclick="deleteTask('${task._id}')">Delete</button>` : ''}
+            </div>
+          </div>`;
+      });
+    }
+
+    async function deleteTask(id) {
+      const res = await fetch(`${API}/tasks/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) getTasks();
+    }
+  </script>
+</body>
+</html>
